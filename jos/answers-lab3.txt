@@ -1,0 +1,30 @@
+Lab 3a Questions
+1. Well, every interrupt may function differently. Say for example we have a divide by 0 interrupt.
+We would most likely want to handle that a bit differently then how we would handle a timer interrupt.
+If we just had one, then we'd be heavily restricting ourselves to singular functions. Let's look at Intel's x86
+Error codes. Notice that around 1/3 - 1/2 of them use error codes to the CPU but not ALL. The CPU would not be able
+to push different interrupts, subsequently the kernel would not be able to differentiate between them.
+
+2. This big concept here is the privilege level/rings we talked about it class. First, let's look at softint. Softint
+calls interrupt 14, which is Page fault and is ring 0. Int 13, otherwise known as General Protection occurs! This is
+because the user is at ring 3 and thus CANNOT access kernel level ideas like memory management and self-paging. Interrupt 13
+is called and thus yells at the user for going outside of its permissions. If the user wanted to do something at a lower level, they'll
+need to use a system call.
+
+If the kernel actually allowed the user to use int 14, then they could do memory management, which as you might imagined, could seriously mess
+things up.
+
+3. So, we can reference both 1 and 2 here. Notice that when we use gdb, it "stops" a program. Why are we allowed to do this? Remember, I
+set up the permission to be at ring 3, thus allowing the user to use the breakpoint method. Back to #2 here, a general protection fault
+is a protection setup by the OS/Hardware to protect the user from touching or otherwise doing things they should not be doing. Let's say I setup
+breakpoint at level 0. This means that if I were to call for a breakpoint, I would not be able to do anything as the breakpoint would be a command
+that I'd only be able to call at the kernel level.
+
+Here's the correct setup: SETGATE(idt[T_BRKPT], 0, GD_KT, t_brkpt, 3), notice that the final argument is "3" for ring 3.
+If I wanted to cause a general protection fault, I'd do this instead: SETGATE(idt[T_BRKPT], 0, GD_KT, t_brkpt, 0). Thus restricting
+the action to a level I can't normally access as a user.
+
+4. Well let's think about #2 again and what conclusion we made about giving the user access. We simply don't want the user to have access
+to all levels of interrupts. By enforcing permissions, we can do a black box approach, essentially, the user only needs certain items, so grant
+them those items. This way they can't harm themselves on accident. By setting these gates, we can protect the user from bad code be it malicious or
+have a sudden error that could overwrite critical functions of the OS.

@@ -1,0 +1,35 @@
+1.Compare kern/mpentry.S side by side with boot/boot.S. Bearing in mind that kern/mpentry.S is compiled and linked to run above KERNBASE just like everything else in the kernel, what is the purpose of macro MPBOOTPHYS? Why is it necessary in kern/mpentry.S but not in boot/boot.S? In other words, what could go wrong if it were omitted in kern/mpentry.S? Hint: recall the differences between the link address and the load address that we have discussed in Lab 1.
+
+First, look at the code provided for "MPBOOTENTRY".
+#define MPBOOTPHYS(s) ((s) - mpentry_start + MPENTRY_PADDR)
+We pass in virtual addresses (since that's what we work in) and reformatting that into a physical address. Then, we place
+it into the spot it needs to be in. It's a good way to calculate where we want the code to be.
+
+As for the second part, we should note when the two things occur. Boot/boot.s occurs during the bios phase and thus is in the
+ultimate position to make any necessary changes. Whereas the kern/mpentry.S happens in the kern phase. In other words, boot.s gets
+to put things at Page 0 whereas the mpentry.s is LINKED to page 0 (thanks to how Kernbase works). If that part is omitted, then
+nothing will work as the code won't load properly (linker doesn't know where to put it).
+
+2.  It seems that using the big kernel lock guarantees that only one CPU can run the kernel code at a time. Why do we still need separate kernel stacks for each CPU? Describe a scenario in which using a shared kernel stack will go wrong, even with the protection of the big kernel lock.
+
+We can think about this like we think about concurrency (and some parts that happen later). It all comes down to the traps, but let's think about thinks in "critical sections". Let's say CPU0 is trying to do something with the current state of the stack. But suddenly,
+CPU(N) comes in with a trap/lock, thus pushing a bunch of registers onto the stack. What if CPU0 was relying on the old stack? Boom, stack
+is bad and corrupted and can't be used properly by CPU0.
+
+3. In your implementation of env_run() you should have called lcr3(). Before and after the call to lcr3(), your code makes references (at least it should) to the variable e, the argument to env_run. Upon loading the %cr3 register, the addressing context used by the MMU is instantly changed. But a virtual address (namely e) has meaning relative to a given address context–the address context specifies the physical address to which the virtual address maps. Why can the pointer e be dereferenced both before and after the addressing switch?
+
+Given how we instantiate UTOP and all it's related variables, the kernel part of the VM of the environments should be the same. It would
+be odd if the kernel was different for each USER environment. That means regardless of what page directory (the kern pgdir) we're
+talking about, it should be the same regardless.
+
+
+4. Whenever the kernel switches from one environment to another, it must ensure the old environment’s registers are saved so they can be restored properly later. Why? Where does this happen?
+
+Well, the simple explanation is that after we handle something, we need to return to the previous state, in other words, the previous
+environment. During the assembly we did during this lab, we freqeuntly went over proper use of the ESP (Stack Pointer) and EIP
+(Instruction Pointer). Essentially we can handle something, say a sycall or a pagefault, after handling that we need to resume back
+at the EXACT point we were BEFORE the handler occurred. As for the registers, they basically hold the state of the hardware, everything
+necessary should be stored within those registers, if we properly push/pop, we can store and restore at will. We the active popping
+during the env_pop_tf function, the end of env_run() does this (thus restoring our previous state after running a trap).
+
+
